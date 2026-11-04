@@ -40,6 +40,14 @@ Formerly known as **USBRetro**.
 
 ---
 
+<!-- emise-body:start -->
+## 🔥 Experiment: Emise's Phext Body (browser)
+
+[**`emise-body/`**](emise-body/) is a self-contained experiment in this fork: a virtual robot body for the agent Emise, controlled entirely through **phext** — sense scrolls the body writes, motor scrolls Emise writes, routed normalize → translate style just like Joypad OS routes controllers. No build step: open [`emise-body/index.html`](emise-body/index.html) in a browser (or serve the repo with `python3 -m http.server` and visit `/emise-body/`) to see the body, write motor scrolls with buttons, and watch the phext state change. A Python twin (`demo.py`) runs the same loop in a terminal. Details and the full phext body map: [`emise-body/README.md`](emise-body/README.md).
+<!-- emise-body:end -->
+
+---
+
 ## I Have an Adapter — How Do I Update It?
 
 1. **Download** the latest `.uf2` for your adapter from [Releases](https://github.com/joypad-ai/joypad-os/releases)

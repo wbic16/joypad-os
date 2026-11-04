@@ -1,0 +1,6 @@
+facing east. ahead: door, 5 cells ahead.
+visible: rose: 1 north, 3 east; open book: 1 south, 1 east; door: 5 east.
+a quiet 7x5 room; the door is set in the east wall.quiet room tone; faint birdsong outside the doorposition: (2, 3)
+facing: east
+battery: 100.0
+holding: noneclear: no contactintent: first body — learn the room, find the rose, say hello
