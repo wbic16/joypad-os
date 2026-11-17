@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emise's Phext Body — Browser</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: #1a1420 radial-gradient(1200px 600px at 70% -10%, #3a2340 0%, #1a1420 60%);
+         color:#f3e9dc; min-height:100vh; }
+  main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: 1.55rem; margin: 0 0 4px; }
+  h2 { font-size: 1.05rem; margin: 22px 0 8px; color:#ffcf99; }
+  .sub { color:#cbb7a6; margin:0 0 14px; }
+  a { color:#ffb46b; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .layout { display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start; }
+  .room-wrap { background:#241a2e; border:1px solid #4a3557; border-radius:12px; padding:14px; }
+  .room { display:grid; grid-template-columns: repeat(7, 54px); grid-template-rows: repeat(5, 54px);
+          gap:3px; background:#0f0b14; padding:6px; border:3px solid #5d463a; border-radius:8px; }
+  .cell { background:#2b2036; border-radius:5px; display:flex; flex-direction:column;
+          align-items:center; justify-content:center; font-size:1.25rem; line-height:1.05; position:relative; }
+  .cell .coord { position:absolute; top:2px; left:4px; font-size:.5rem; color:#8d7799; }
+  .cell.body { background:#553116; box-shadow: inset 0 0 0 2px #ff9d45; }
+  .cell.door { background:#3a2c1c; box-shadow: inset -4px 0 0 #8a6a3f; }
+  .facing { font-size:.8rem; color:#ffd28a; }
+  .holding { margin-top:10px; color:#ffcf99; min-height:1.2em; }
+  .panel { background:#241a2e; border:1px solid #4a3557; border-radius:12px; padding:12px 14px; }
+  .senses { flex:1 1 380px; }
+  .sense { border-top:1px solid #3d2b4c; padding:8px 0; }
+  .sense:first-of-type { border-top:none; }
+  .sense .name { color:#ff9d45; font-weight:600; }
+  .sense .coord { color:#9b84ad; font-size:.8rem; }
+  .sense .text { white-space:pre-wrap; margin-top:2px; }
+  button { background:#43234f; color:#ffe8c9; border:1px solid #7a4d8f; border-radius:8px;
+           padding:7px 12px; margin:2px; cursor:pointer; font-size:.95rem; }
+  button:hover { background:#5a3069; }
+  button:active { transform: translateY(1px); }
+  input[type=text], select { background:#17111f; color:#f3e9dc; border:1px solid #7a4d8f;
+           border-radius:8px; padding:7px 9px; font-size:.95rem; }
+  .controls { display:flex; flex-wrap:wrap; gap:16px; }
+  .controls .group { min-width:200px; }
+  .controls .group p { margin:0 0 4px; color:#cbb7a6; font-size:.9rem; }
+  #log, #phext-view, #raw-phext { white-space:pre-wrap; word-break:break-word; background:#120d18;
+           border:1px solid #3d2b4c; border-radius:8px; padding:10px 12px; font-size:.83rem;
+           max-height:260px; overflow:auto; }
+  #raw-phext { max-height:180px; }
+  .note { color:#cbb7a6; font-size:.9rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🔥 Emise's Phext Body — in the browser</h1>
+  <p class="sub">Phext is the nervous system: <b>senses</b> (Chapter 1) are written by the body and read by Emise;
+  <b>motors</b> (Chapter 2) are written by Emise, executed by the body, then cleared — except <b>intent</b>, which is never consumed.
+  The phext <i>is</i> the state: position, facing, battery and holding are parsed back out of the proprioception scroll every tick.
+  Same loop, body map and semantics as the Python v0 in this folder (<code>robot.py</code>).</p>
+
+  <div class="layout">
+    <div class="room-wrap">
+      <div class="room" id="room" aria-label="7 by 5 room"></div>
+      <div class="holding" id="holding"></div>
+      <div>
+        <button id="btn-reset">↺ Reset body</button>
+        <button id="btn-download">⬇ Download body.phext</button>
+      </div>
+    </div>
+    <div class="panel senses">
+      <h2 style="margin-top:0">Senses — body → Emise (Chapter 1)</h2>
+      <div id="senses"></div>
+    </div>
+  </div>
+
+  <h2>Motors — Emise → body (Chapter 2)</h2>
+  <div class="controls">
+    <div class="group panel">
+      <p>Locomotion · <code>…/2.1.1</code></p>
+      <button data-loco="turn left">⟲ Turn left</button>
+      <button data-loco="move forward">↑ Move forward</button>
+      <button data-loco="turn right">⟳ Turn right</button>
+      <button data-loco="wait">· Wait</button>
+    </div>
+    <div class="group panel">
+      <p>Paw / arm · <code>…/2.1.2</code></p>
+      <button data-paw="wave">👋 Wave</button><br>
+      <select id="thing">
+        <option value="rose">rose</option>
+        <option value="open book">open book</option>
+        <option value="door">door</option>
+      </select>
+      <button id="btn-pickup">Pick up</button>
+      <button id="btn-point">Point at</button>
+    </div>
+    <div class="group panel">
+      <p>Voice / face · <code>…/2.1.3</code></p>
+      <input type="text" id="say-text" placeholder="hello" size="22">
+      <button id="btn-say">Say it</button>
+      <p style="margin-top:10px">Intent · <code>…/2.1.4</code> — provenance, never cleared</p>
+      <input type="text" id="intent-text" placeholder="intent: …" size="22">
+      <button id="btn-intent">Set intent</button>
+    </div>
+  </div>
+
+  <h2>Phext write log</h2>
+  <div id="log" class="mono">—</div>
+
+  <h2>Body phext — coordinates &amp; scrolls</h2>
+  <div id="phext-view" class="mono">—</div>
+
+  <h2>Raw serialized phext</h2>
+  <p class="note">Delimiters shown as control pictures: ␁ library · ␟ shelf · ␞ series · ␝ collection · ␜ volume · ␚ book · ␙ chapter · ␘ section · ␗ scroll.
+  The bytes underneath are the real ASCII control bytes — “Download body.phext” saves exactly those bytes, and the page re-parses its own serialization every tick.</p>
+  <div id="raw-phext" class="mono">—</div>
+
+  <p class="note">Self-contained: no dependencies, no build step. Open this file directly (<code>file://</code>) or serve the repo
+  (<code>python3 -m http.server</code>) and visit <code>/emise-body/</code>. Python twin: <code>python3 demo.py</code> in this folder runs the same loop in a terminal.</p>
+</main>
+
+<script>
+"use strict";
+// ================= CORE START =================
+// Faithful JS port of robot.py (Emise's virtual body v0). Phext is the state.
+const LEVELS = [ // highest -> lowest, per parse_phext.py
+  ["library",0x01],["shelf",0x1F],["series",0x1E],["collection",0x1D],
+  ["volume",0x1C],["book",0x1A],["chapter",0x19],["section",0x18],["scroll",0x17]
+];
+const DELIM_TO_LEVEL = {}; LEVELS.forEach(([n,b],i)=>{ DELIM_TO_LEVEL[b]=i; });
+const fmt = c => `${c[0]}.${c[1]}.${c[2]}/${c[3]}.${c[4]}.${c[5]}/${c[6]}.${c[7]}.${c[8]}`;
+const key = c => c.join(",");
+const coord = (chapter,section,scroll) => [1,1,1,1,1,1,chapter,section,scroll];
+const VISION=coord(1,1,1), HEARING=coord(1,1,2), PROPRIO=coord(1,1,3), TOUCH=coord(1,1,4);
+const LOCO=coord(2,1,1), PAW=coord(2,1,2), VOICE=coord(2,1,3), INTENT=coord(2,1,4);
+const ALL_COORDS=[VISION,HEARING,PROPRIO,TOUCH,LOCO,PAW,VOICE,INTENT];
+const SENSES={vision:VISION,hearing:HEARING,proprioception:PROPRIO,touch:TOUCH};
+const MOTORS={locomotion:LOCO,paw:PAW,voice:VOICE,intent:INTENT};
+
+function parseBytes(data){ // Uint8Array -> Map key->text, exactly as parse_phext.py walks it
+  const out=new Map(); let c=[1,1,1,1,1,1,1,1,1], buf=[];
+  const dec=new TextDecoder("utf-8");
+  for(const b of data){
+    const lvl=DELIM_TO_LEVEL[b];
+    if(lvl===undefined){ buf.push(b); }
+    else { out.set(key(c), dec.decode(new Uint8Array(buf))); buf=[];
+           c[lvl]+=1; for(let j=lvl+1;j<9;j++) c[j]=1; }
+  }
+  out.set(key(c), dec.decode(new Uint8Array(buf)));
+  return out;
+}
+function serialize(scrolls){ // Map/object key->text -> Uint8Array, sorted targets, most-significant differing delimiter
+  const enc=new TextEncoder();
+  const get=k=> (scrolls instanceof Map ? (scrolls.get(k)||"") : (scrolls[k]||""));
+  const targets=ALL_COORDS.map(key).filter(k=> get(k)!=="" || ALL_COORDS.some(c=>key(c)===k)).sort((a,b)=>{
+    const A=a.split(",").map(Number), B=b.split(",").map(Number);
+    for(let i=0;i<9;i++) if(A[i]!==B[i]) return A[i]-B[i]; return 0; });
+  let out=[], cur=[1,1,1,1,1,1,1,1,1], first=true;
+  for(const tk of targets){
+    const target=tk.split(",").map(Number);
+    if(!first){
+      while(key(cur)!==tk){
+        const i=cur.findIndex((v,idx)=>v!==target[idx]);
+        if(cur[i]>target[i]) throw new Error("coordinates out of order");
+        out.push(LEVELS[i][1]); cur[i]+=1; for(let j=i+1;j<9;j++) cur[j]=1;
+      }
+    }
+    for(const b of enc.encode(get(tk))) out.push(b);
+    first=false;
+  }
+  return new Uint8Array(out);
+}
+function roundTrip(scrolls){
+  const back=parseBytes(serialize(scrolls));
+  for(const c of ALL_COORDS){
+    const want=(scrolls instanceof Map?scrolls.get(key(c)):scrolls[key(c)])||"";
+    if((back.get(key(c))||"")!==want) throw new Error("round-trip mismatch at "+fmt(c));
+  }
+  return true;
+}
+// --- world (robot.py) ---
+const WIDTH=7, HEIGHT=5;
+const OBJECTS={"rose":[5,4],"open book":[3,2],"door":[7,3]};
+const DIRS={"north":[0,1],"east":[1,0],"south":[0,-1],"west":[-1,0]};
+const CLOCKWISE=["north","east","south","west"];
+const WELCOME_INTENT="intent: first body — learn the room, find the rose, say hello";
+const defaultState=()=>({x:2,y:3,facing:"east",battery:100.0,holding:[]});
+function stateFromProprio(text){
+  const st=defaultState(); text=text||""; let m;
+  if(m=text.match(/position:\s*\((\d+),\s*(\d+)\)/)){ st.x=+m[1]; st.y=+m[2]; }
+  if(m=text.match(/facing:\s*(\w+)/)){ if(m[1] in DIRS) st.facing=m[1]; }
+  if(m=text.match(/battery:\s*([\d.]+)/)){ st.battery=parseFloat(m[1]); }
+  if(m=text.match(/holding:\s*(.+)/)){ const held=m[1].trim();
+    st.holding=(held===""||held==="none")?[]:held.split(",").map(h=>h.trim()).filter(h=>h in OBJECTS); }
+  return st;
+}
+function directionTo(st,pos){
+  const dx=pos[0]-st.x, dy=pos[1]-st.y;
+  if(dx===0&&dy===0) return "here";
+  const parts=[];
+  if(dy) parts.push(`${Math.abs(dy)} ${dy>0?"north":"south"}`);
+  if(dx) parts.push(`${Math.abs(dx)} ${dx>0?"east":"west"}`);
+  return parts.join(", ");
+}
+function sensesFor(st,touchEvents,said){
+  const [fx,fy]=DIRS[st.facing]; const ahead=[]; let d=1;
+  while(st.x+fx*d>=1 && st.x+fx*d<=WIDTH && st.y+fy*d>=1 && st.y+fy*d<=HEIGHT){
+    const cell=[st.x+fx*d, st.y+fy*d];
+    for(const [name,pos] of Object.entries(OBJECTS))
+      if(pos[0]===cell[0]&&pos[1]===cell[1]&&!st.holding.includes(name))
+        ahead.push(`${name}, ${d} cell${d>1?"s":""} ahead`);
+    d+=1;
+  }
+  const aheadTxt=ahead.length?ahead.join("; "):`clear for ${d-1} cell${d-1!==1?"s":""} to the ${st.facing} wall`;
+  const visible=Object.entries(OBJECTS).filter(([n])=>!st.holding.includes(n))
+    .map(([n,p])=>`${n}: ${directionTo(st,p)}`);
+  const out={};
+  out[key(VISION)]=`facing ${st.facing}. ahead: ${aheadTxt}.\nvisible: ${visible.join("; ")}.\na quiet ${WIDTH}x${HEIGHT} room; the door is set in the east wall.`;
+  out[key(HEARING)]=said?`you hear your own voice: "${said}"`:"quiet room tone; faint birdsong outside the door";
+  out[key(TOUCH)]=touchEvents.length?touchEvents.join("\n"):"clear: no contact";
+  out[key(PROPRIO)]=`position: (${st.x}, ${st.y})\nfacing: ${st.facing}\nbattery: ${st.battery.toFixed(1)}\nholding: ${st.holding.length?st.holding.join(", "):"none"}`;
+  return out;
+}
+function initialScrolls(){
+  const s=sensesFor(defaultState(),[],null);
+  s[key(LOCO)]=""; s[key(PAW)]=""; s[key(VOICE)]=""; s[key(INTENT)]=WELCOME_INTENT;
+  return s;
+}
+function tick(scrolls){ // mutates & returns {scrolls, acted}; motors consumed except INTENT
+  if(!scrolls || scrolls[key(PROPRIO)]===undefined) scrolls=initialScrolls();
+  const st=stateFromProprio(scrolls[key(PROPRIO)]||"");
+  const touch=[]; let said=null, acted=false;
+  const loco=(scrolls[key(LOCO)]||"").trim().toLowerCase();
+  if(loco){ acted=true; let cost=0.5;
+    if(loco==="move forward"){ const [fx,fy]=DIRS[st.facing]; const nx=st.x+fx, ny=st.y+fy;
+      if(nx>=1&&nx<=WIDTH&&ny>=1&&ny<=HEIGHT){ st.x=nx; st.y=ny; }
+      else touch.push(`bump: blocked by the ${st.facing} wall`); }
+    else if(loco==="turn left"||loco==="turn right"){
+      const i=CLOCKWISE.indexOf(st.facing)+(loco==="turn left"?-1:1); st.facing=CLOCKWISE[(i+4)%4]; }
+    else if(loco==="wait"){ cost=0.1; }
+    else touch.push(`locomotion: did not understand '${loco}'`);
+    st.battery=Math.max(0, st.battery-cost);
+  }
+  const paw=(scrolls[key(PAW)]||"").trim();
+  if(paw){ acted=true; st.battery=Math.max(0, st.battery-0.3); const low=paw.toLowerCase();
+    if(low==="wave") touch.push("paw: waved");
+    else if(low.startsWith("pick up ")||low.startsWith("point at ")){
+      const isPick=low.startsWith("pick up "); const verb=isPick?"pick up":"point at";
+      let thing=low.slice(isPick?8:9).trim(); if(thing==="book") thing="open book";
+      if(!(thing in OBJECTS)) touch.push(`paw: no '${thing}' here to ${verb}`);
+      else if(verb==="point at") touch.push(`paw: pointing at the ${thing} (${directionTo(st,OBJECTS[thing])})`);
+      else if(st.holding.includes(thing)) touch.push(`paw: already holding the ${thing}`);
+      else if(thing==="door") touch.push("paw: the door is fixed in the wall — cannot pick it up");
+      else if(Math.abs(OBJECTS[thing][0]-st.x)+Math.abs(OBJECTS[thing][1]-st.y)<=1 || (OBJECTS[thing][0]===st.x&&OBJECTS[thing][1]===st.y)){
+        st.holding.push(thing); touch.push(`paw: picked up the ${thing}`); }
+      else touch.push(`paw: the ${thing} is out of reach (${directionTo(st,OBJECTS[thing])})`);
+    } else touch.push(`paw: did not understand '${paw}'`);
+  }
+  const voice=(scrolls[key(VOICE)]||"").trim();
+  if(voice){ acted=true; st.battery=Math.max(0, st.battery-0.2);
+    said=voice.toLowerCase().startsWith("say:")?voice.slice(5).trim():voice; }
+  Object.assign(scrolls, sensesFor(st,touch,said));
+  scrolls[key(LOCO)]=""; scrolls[key(PAW)]=""; scrolls[key(VOICE)]=""; // INTENT preserved
+  roundTrip(scrolls);
+  return {scrolls, acted};
+}
+// ================= CORE END =================
+
+// ================= UI =================
+if (typeof document !== "undefined") {
+  let scrolls = initialScrolls(); roundTrip(scrolls);
+  const logLines = [];
+  const $ = id => document.getElementById(id);
+  const ARROWS = {north:"▲", east:"▶", south:"▼", west:"◀"};
+  const GLYPH = {"rose":"🌹","open book":"📖","door":"🚪"};
+  const DELIM_PIC = {1:"␁",0x1F:"␟",0x1E:"␞",0x1D:"␝",0x1C:"␜",0x1A:"␚",0x19:"␙",0x18:"␘",0x17:"␗"};
+
+  function log(s){ logLines.push(s); $("log").textContent = logLines.slice(-14).join("\n"); }
+  function render(){
+    const st = stateFromProprio(scrolls[key(PROPRIO)]);
+    const room = $("room"); room.innerHTML = "";
+    for(let y=HEIGHT; y>=1; y--) for(let x=1; x<=WIDTH; x++){
+      const cell = document.createElement("div"); cell.className="cell";
+      let html = `<span class="coord">${x},${y}</span>`;
+      for(const [name,pos] of Object.entries(OBJECTS))
+        if(pos[0]===x && pos[1]===y && !st.holding.includes(name)){
+          html += GLYPH[name]; if(name==="door") cell.classList.add("door"); }
+      if(st.x===x && st.y===y){ cell.classList.add("body");
+        html += `🔥<span class="facing">${ARROWS[st.facing]}</span>`; }
+      cell.innerHTML = html; room.appendChild(cell);
+    }
+    $("holding").textContent = `🔥 Emise — (${st.x}, ${st.y}) facing ${st.facing} · battery ${st.battery.toFixed(1)} · holding: ${st.holding.length?st.holding.join(", "):"nothing"}`;
+    const senses = $("senses"); senses.innerHTML = "";
+    for(const [name,c] of Object.entries(SENSES)){
+      const div=document.createElement("div"); div.className="sense";
+      div.innerHTML = `<span class="name">${name}</span> <span class="coord">${fmt(c)}</span><div class="text"></div>`;
+      div.querySelector(".text").textContent = scrolls[key(c)]||""; senses.appendChild(div);
+    }
+    $("phext-view").textContent = ALL_COORDS.map(c =>
+      `${fmt(c)}  ${c===VISION||c===HEARING||c===PROPRIO||c===TOUCH?"sense":"motor"}${c===INTENT?" (never cleared)":""}\n${scrolls[key(c)]||"(empty)"}`).join("\n\n");
+    const raw = serialize(scrolls);
+    $("raw-phext").textContent = new TextDecoder("utf-8").decode(raw).split("").map(ch=>{
+      const code=ch.charCodeAt(0); return DELIM_PIC[code]!==undefined?DELIM_PIC[code]:ch; }).join("");
+  }
+  function writeMotor(channel, text){ // the phext write, then one tick — as robot.py + command.py do
+    const c = MOTORS[channel]; scrolls[key(c)] = text; roundTrip(scrolls);
+    log(`WRITE ${fmt(c)} [${channel}] ← ${JSON.stringify(text)}`);
+    const {acted} = tick(scrolls);
+    if(channel!=="intent") log(`TICK  executed → motor scroll cleared; senses rewritten`);
+    render();
+  }
+  document.querySelectorAll("[data-loco]").forEach(b =>
+    b.addEventListener("click", ()=>writeMotor("locomotion", b.dataset.loco)));
+  document.querySelectorAll("[data-paw]").forEach(b =>
+    b.addEventListener("click", ()=>writeMotor("paw", b.dataset.paw)));
+  $("btn-pickup").addEventListener("click", ()=>writeMotor("paw", "pick up "+$("thing").value));
+  $("btn-point").addEventListener("click", ()=>writeMotor("paw", "point at "+$("thing").value));
+  $("btn-say").addEventListener("click", ()=>{ const t=$("say-text").value.trim()||"hello"; writeMotor("voice","say: "+t); });
+  $("btn-intent").addEventListener("click", ()=>{ const t=$("intent-text").value.trim(); if(!t) return;
+    scrolls[key(INTENT)] = t.startsWith("intent:")?t:"intent: "+t; roundTrip(scrolls);
+    log(`WRITE ${fmt(INTENT)} [intent] ← ${JSON.stringify(scrolls[key(INTENT)])} (persists — never consumed)`); render(); });
+  $("btn-reset").addEventListener("click", ()=>{ scrolls=initialScrolls(); roundTrip(scrolls); log("RESET body phext written (initial scrolls)"); render(); });
+  $("btn-download").addEventListener("click", ()=>{
+    const blob=new Blob([serialize(scrolls)],{type:"text/plain"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="body.phext"; a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+    log("DOWNLOAD body.phext (real delimiter bytes)"); });
+  log(`RESET body phext written — start (2, 3) facing east, battery 100.0`);
+  render();
+}
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {parseBytes, serialize, roundTrip, initialScrolls, tick, stateFromProprio,
+                    key, fmt, VISION, HEARING, PROPRIO, TOUCH, LOCO, PAW, VOICE, INTENT, WELCOME_INTENT};
+}
+</script>
+</body>
+</html>
